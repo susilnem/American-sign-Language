@@ -1,7 +1,7 @@
 
 # American Sign Language Detection using CNN (Convolutional Neural Network) and Deep Learning.
 
-This is my final project on American Sign Language uses Convolutional Neural Networks (CNN) to recognize and translate ASL gestures into written text and Speech. The CNN model is trained on a large dataset of ASL images, and the project includes a user interface, image processing module, and database of signs and translations. The project aims to make ASL more accessible and improve communication between the deaf and hearing communities.
+This is my final year project on American Sign Language uses Convolutional Neural Networks (CNN) to recognize and translate ASL gestures into written text and Speech. The CNN model is trained on a large dataset of ASL images, and the project includes a user interface, image processing module, and database of signs and translations. The project aims to make ASL more accessible and improve communication between the deaf and hearing communities.
 -
 Certainly! The goal of the project is to develop a machine learning system that can accurately recognize and translate ASL gestures into written text, making the language more accessible to people who are not familiar with it.
 
