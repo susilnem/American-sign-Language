@@ -14,3 +14,8 @@ Additionally, the project includes a database of ASL signs and corresponding tex
 Overall, the project aims to improve communication and accessibility between the deaf and hearing communities by providing a tool that can accurately recognize and translate ASL gestures into written text.
 
 ### Workflow will be provided after completion! 😃 😃 😃 
+So basically You need to go to the folder
+`Final Project` -> `Source Code`
+and follow the instructions from [Readme.file](./Final%20Project/Source%20Code/README.md)
+
+![Images](./Final%20Project/Source%20Code/signs.png)
