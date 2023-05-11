@@ -132,7 +132,6 @@ input/
 
 # data files
 *.csv
-*.h5
 *.pkl
 # *.pth
 Approach.md
