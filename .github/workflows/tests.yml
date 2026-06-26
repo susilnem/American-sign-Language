@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    name: Pre-commit & Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: '.python-version'
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Check lockfile is up to date
+        run: uv lock --locked
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - uses: pre-commit/action@v3.0.1
+
+      - name: Run tests
+        run: uv run pytest --tb=short

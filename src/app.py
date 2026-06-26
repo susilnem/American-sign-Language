@@ -7,18 +7,21 @@ _libX11 = ctypes.util.find_library("X11")
 if _libX11:
     ctypes.cdll.LoadLibrary(_libX11).XInitThreads()
 
-import numpy as np
-import cv2
-import traceback
 import tkinter as tk
+import traceback
+
+import cv2
+import numpy as np
 
 cv2.setNumThreads(1)
 from pathlib import Path
 from string import ascii_uppercase
+
+from cvzone.HandTrackingModule import HandDetector
 from PIL import Image, ImageTk
 from tf_keras.models import load_model
-from cvzone.HandTrackingModule import HandDetector
-from predictor import predict_letter, draw_skeleton
+
+from predictor import draw_skeleton, predict_letter
 
 ASSETS = Path(__file__).parent.parent / "assets"
 
