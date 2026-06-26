@@ -1,32 +1,38 @@
+# American Sign Language to Text
 
-# American Sign Language Detection using CNN (Convolutional Neural Network) and Deep Learning.
+Real-time ASL gesture recognition that translates hand signs into text and speech — built with a CNN + MediaPipe hand tracking pipeline.
 
-This is my final year project on American Sign Language uses Convolutional Neural Networks (CNN) to recognize and translate ASL gestures into written text and Speech. The CNN model is trained on a large dataset of ASL images, and the project includes a user interface, image processing module, and database of signs and translations. The project aims to make ASL more accessible and improve communication between the deaf and hearing communities.
--
-Certainly! The goal of the project is to develop a machine learning system that can accurately recognize and translate ASL gestures into written text, making the language more accessible to people who are not familiar with it.
+This is a final year project aimed at improving communication accessibility between the deaf and hearing communities.
 
-To accomplish this, we are using a deep learning model called a Convolutional Neural Network (CNN), which is well-suited for image recognition tasks like ASL gesture recognition. The CNN model is trained on a large dataset of ASL images to learn the patterns and features of different ASL gestures.
+## Output
 
-The project includes several components, including a user interface that allows users to make ASL gestures using a webcam or other camera device, an image processing module that extracts features from the captured images, and a deep learning model that predicts the corresponding text based on the recognized gestures.
+![Output 1](./documentation/images/1.png)
 
-Additionally, the project includes a database of ASL signs and corresponding text translations, as well as a training module that allows the deep learning model to be updated with new data.
+![Output 2](./documentation/images/2.png)
 
-Overall, the project aims to improve communication and accessibility between the deaf and hearing communities by providing a tool that can accurately recognize and translate ASL gestures into written text.
+![Output 3](./documentation/images/3.png)
 
-### In order to Run the Code locally ! 
-So basically You need to go to the folder
-`Final Project` -> `Source Code`
-and follow the instructions from [Readme.file](./Final%20Project/Source%20Code/README.md)
+![Output 4](./documentation/images/4.png)
 
-![Images](./Final%20Project/Source%20Code/signs.png)
+![Output 5](./documentation/images/5.png)
 
-# Outputs:
-![image1](./Final%20Project/Documentation/images/1.png)
+## How it works
 
-![image2](./Final%20Project/Documentation/images/2.png)
+1. Webcam captures your hand in real time
+2. MediaPipe extracts 21 hand landmark points
+3. Landmarks are drawn as a skeleton on a blank canvas
+4. A CNN classifies the skeleton into one of 8 visual groups
+5. Geometry rules pick the exact letter within the group
+6. Word suggestions (pyenchant) and text-to-speech (eSpeak) complete the experience
 
-![image3](./Final%20Project/Documentation/images/3.png)
+See [workflow.md](./workflow.md) for the full technical breakdown.
 
-![image4](./Final%20Project/Documentation/images/4.png)
+## Getting started
 
-![image5](./Final%20Project/Documentation/images/5.png)
+See [src/README.md](./src/README.md) for setup and run instructions.
+
+## Model performance
+
+![Model accuracy](./documentation/Model%20Accuracy.png)
+
+![Confusion matrix](./documentation/Confusion%20matrix.png)

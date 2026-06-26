@@ -1,0 +1,29 @@
+[project]
+name = "American-Sign-Language-Recognition"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "tensorflow>=2.17",
+    "tf-keras",
+    "opencv-python",
+    "opencv-contrib-python",
+    "cvzone",
+    "mediapipe",
+    "numpy",
+    "pillow",
+    "pyttsx3",
+    "pyenchant",
+    "matplotlib",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.uv]
+package = false
