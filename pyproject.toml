@@ -11,9 +11,10 @@ dependencies = [
     "mediapipe",
     "numpy",
     "pillow",
-    "pyttsx3",
+    "piper-tts",
+    "sounddevice",
     "pyenchant",
-    "matplotlib",
+    "loguru>=0.7.3",
 ]
 
 [dependency-groups]
@@ -28,7 +29,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
@@ -38,6 +39,7 @@ select = ["E", "F", "W", "I"]
 "src/app.py" = ["E402"]
 "src/collect.py" = ["E402"]
 "src/predict.py" = ["E402"]
+"src/train.py" = ["E402"]
 
 [tool.uv]
 package = false

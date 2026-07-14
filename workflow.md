@@ -43,7 +43,7 @@ Predicted Letter
 Sentence Builder + Word Suggestions (pyenchant)
     │
     ▼
-Text-to-Speech (pyttsx3)
+Text-to-Speech (Piper)
 ```
 
 ---

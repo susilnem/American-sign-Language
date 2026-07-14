@@ -139,3 +139,11 @@ Approach.md
 input/
 outputs/
 data/
+
+.downloaded_cache/
+
+assets/cnn8grps_rad1_model_custom.h5
+assets/*.h5.bak
+
+# Rotating log files written by src/logging_config.py
+logs/

@@ -423,7 +423,11 @@ def predict_letter(pts, prob):
     ch1 = disambiguate(pts, ch1)
 
     # space gesture: index+middle up, ring+pinky down
-    if ch1 in (1, "E", "S", "X", "Y", "B"):
+    # (the bare int 1 this used to also match was the raw, unmapped group-1
+    # code that could leak out of disambiguate() before its "D" default was
+    # added — disambiguate() now always returns a letter, so that case can't
+    # happen anymore and the literal was removed.)
+    if ch1 in ("E", "S", "X", "Y", "B"):
         if (
             pts[6][1] > pts[8][1]
             and pts[10][1] < pts[12][1]
@@ -527,6 +531,19 @@ def disambiguate(pts, ch1):
         ch1 = "Y" if distance(pts[8], pts[4]) > 42 else "J"
 
     elif ch1 == 1:
+        # Unlike every other group above, this one previously had no default
+        # assignment before its chain of geometry checks — if none matched,
+        # `disambiguate` returned the raw internal group number (int `1`)
+        # instead of a letter. That wasn't purely a bug: the original
+        # pre-refactor code relied on exactly this fallthrough — the int `1`
+        # leaking into predict_letter's space-gesture check (which tests the
+        # same geometry as one of the uncovered cases below) — as its way of
+        # producing a space for group-1 hand poses none of the letter branches
+        # below match. Defaulting to a letter (e.g. "D") like group 0 does
+        # broke that: it silently ate the space case. Defaulting to " "
+        # directly instead fixes the original bug (never leaks a bare int)
+        # while preserving the original space-fallback behavior.
+        ch1 = " "
         if (
             pts[6][1] > pts[8][1]
             and pts[10][1] > pts[12][1]
