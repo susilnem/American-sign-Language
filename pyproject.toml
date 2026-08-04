@@ -1,0 +1,45 @@
+[project]
+name = "American-Sign-Language-Recognition"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "tensorflow>=2.17",
+    "tf-keras",
+    "opencv-python",
+    "opencv-contrib-python",
+    "cvzone",
+    "mediapipe",
+    "numpy",
+    "pillow",
+    "piper-tts",
+    "sounddevice",
+    "pyenchant",
+    "loguru>=0.7.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+    "pre-commit",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# XInitThreads() must run before X11 imports — intentional import order
+"src/app.py" = ["E402"]
+"src/collect.py" = ["E402"]
+"src/predict.py" = ["E402"]
+"src/train.py" = ["E402"]
+
+[tool.uv]
+package = false
