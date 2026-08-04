@@ -173,6 +173,53 @@ class _HandLandmarker:
         self._detector.close()
 
 
+def locate_hand(hd, full_frame_bgr):
+    """Two-pass detection (full frame, then a tight crop) -> (pts, w, h),
+    or None if no hand found. `w, h` are the full-frame bbox size, used
+    by _build_result to center the skeleton on canvas.
+
+    Module-level (not tied to DetectorWorker) so predict.py/collect.py can
+    reuse the exact same detection path the live app uses instead of
+    hand-rolling their own — that duplication previously carried two live
+    bugs (unclamped crop bounds, and two competing HandDetector instances)
+    that had already been fixed once, here, and nowhere else."""
+    hands = hd.find_hands(full_frame_bgr)
+    if not hands:
+        return None
+
+    hand = hands[0]
+    x, y, w, h = hand["bbox"]
+    frame_h, frame_w = full_frame_bgr.shape[:2]
+    x0 = max(0, x - OFFSET)
+    y0 = max(0, y - OFFSET)
+    x1 = min(frame_w, x + w + OFFSET)
+    y1 = min(frame_h, y + h + OFFSET)
+    cropped = full_frame_bgr[y0:y1, x0:x1]
+    if not cropped.size:
+        return None
+
+    # only upscale crops smaller than MIN_DETECT_SIDE
+    scale = 1.0
+    short_side = min(cropped.shape[:2])
+    detect_crop = cropped
+    if short_side < MIN_DETECT_SIDE:
+        scale = MIN_DETECT_SIDE / short_side
+        detect_crop = cv2.resize(
+            cropped, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC
+        )
+
+    handz = hd.find_hands(detect_crop)
+    if not handz:
+        return None
+
+    hand = handz[0]
+    pts = hand["lmList"]
+    if scale != 1.0:
+        pts = [[round(px / scale), round(py / scale), pz] for px, py, pz in pts]
+
+    return pts, w, h
+
+
 class DetectionResult:
     """One completed detection: the rendered skeleton image and the raw
     predicted symbol (letter / ' ' / 'next' / 'Backspace')."""
@@ -236,13 +283,27 @@ class DetectorWorker:
             pass
         self._thread.join(timeout=timeout)
 
+    @staticmethod
+    def _init_engine(model_path):
+        """Construct the HandLandmarker + load the model. If the model
+        fails to load after the landmarker was already constructed, close
+        the landmarker before re-raising — otherwise its native GL/EGL
+        context leaks for the rest of the process even though the worker
+        thread gives up and exits."""
+        hd = _HandLandmarker(max_hands=1)
+        try:
+            model = load_model(str(model_path))
+        except Exception:
+            hd.close()
+            raise
+        return hd, model
+
     def _run(self):
         # Constructed here, on this thread, once, for the lifetime of the
         # process — never on the main thread, never more than one instance.
         # See the module docstring for why that matters.
         try:
-            hd = _HandLandmarker(max_hands=1)
-            model = load_model(str(self._model_path))
+            hd, model = self._init_engine(self._model_path)
         except Exception:
             logger.exception("DetectorWorker failed to start")
             return  # thread exits; app stays up, just gets no hand results
@@ -255,20 +316,9 @@ class DetectorWorker:
                 if item is None or self._stop.is_set():
                     break
 
-                frame_bgr = item
-                try:
-                    located = self._locate_hand(hd, frame_bgr)
-                except Exception:
-                    logger.exception("Hand detection failed for a frame")
+                result, smoothed_pts = self._process_one(hd, model, item, smoothed_pts)
+                if result is None:
                     continue
-
-                if located is None:
-                    smoothed_pts = None  # don't smooth into a stale position
-                    continue
-
-                pts, w, h = located
-                smoothed_pts = smooth_landmarks(smoothed_pts, pts)
-                result = self._build_result(model, pts, smoothed_pts, w, h)
 
                 try:
                     self._out_q.get_nowait()
@@ -281,48 +331,30 @@ class DetectorWorker:
         finally:
             hd.close()
 
-    @staticmethod
-    def _locate_hand(hd, full_frame_bgr):
-        """Two-pass detection (full frame, then a tight crop) -> (pts, w, h),
-        or None if no hand found. `w, h` are the full-frame bbox size, used
-        by _build_result to center the skeleton on canvas."""
-        hands = hd.find_hands(full_frame_bgr)
-        if not hands:
-            return None
+    def _process_one(self, hd, model, frame_bgr, smoothed_pts):
+        """Locate + classify one frame. Returns (result, new_smoothed_pts):
+        `result` is None if no hand was found, or if detection/
+        classification raised — a bad frame (e.g. a shape mismatch from a
+        custom --model) must never be allowed to propagate out of _run and
+        silently kill the worker thread for the rest of the process."""
+        try:
+            located = locate_hand(hd, frame_bgr)
+        except Exception:
+            logger.exception("Hand detection failed for a frame")
+            return None, None  # don't smooth into a stale position
 
-        hand = hands[0]
-        x, y, w, h = hand["bbox"]
-        frame_h, frame_w = full_frame_bgr.shape[:2]
-        x0 = max(0, x - OFFSET)
-        y0 = max(0, y - OFFSET)
-        x1 = min(frame_w, x + w + OFFSET)
-        y1 = min(frame_h, y + h + OFFSET)
-        cropped = full_frame_bgr[y0:y1, x0:x1]
-        if not cropped.size:
-            return None
+        if located is None:
+            return None, None  # don't smooth into a stale position
 
-        # See MIN_DETECT_SIDE above: only upscale crops that are actually too
-        # small to detect reliably — hands already close enough to work today
-        # get scale=1.0 and take the exact same path as before.
-        scale = 1.0
-        short_side = min(cropped.shape[:2])
-        detect_crop = cropped
-        if short_side < MIN_DETECT_SIDE:
-            scale = MIN_DETECT_SIDE / short_side
-            detect_crop = cv2.resize(
-                cropped, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC
-            )
+        pts, w, h = located
+        new_smoothed_pts = smooth_landmarks(smoothed_pts, pts)
+        try:
+            result = self._build_result(model, pts, new_smoothed_pts, w, h)
+        except Exception:
+            logger.exception("Building detection result failed for a frame")
+            return None, new_smoothed_pts
 
-        handz = hd.find_hands(detect_crop)
-        if not handz:
-            return None
-
-        hand = handz[0]
-        pts = hand["lmList"]
-        if scale != 1.0:
-            pts = [[round(px / scale), round(py / scale), pz] for px, py, pz in pts]
-
-        return pts, w, h
+        return result, new_smoothed_pts
 
     @staticmethod
     def _build_result(model, pts, smoothed_pts, w, h):
@@ -330,7 +362,7 @@ class DetectorWorker:
         classification sees); `pts` — raw, unsmoothed — is what
         `predict_letter`'s geometry rules reason about. See SMOOTHING_ALPHA's
         comment for why those two must not be the same array."""
-        white = np.ones((400, 400, 3), np.uint8) * 255
+        white = np.full((400, 400, 3), 255, np.uint8)
         os_x = ((400 - w) // 2) - 15
         os_y = ((400 - h) // 2) - 15
         draw_skeleton(white, smoothed_pts, os_x, os_y)

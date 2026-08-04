@@ -7,9 +7,11 @@ _libX11 = ctypes.util.find_library("X11")
 if _libX11:
     ctypes.cdll.LoadLibrary(_libX11).XInitThreads()
 
+import contextlib
 import os
 import shutil
 import subprocess
+import sys
 import time
 import tkinter as tk
 from tkinter import ttk
@@ -119,10 +121,32 @@ def _tracked(text, gap=" "):
     return gap.join(text)
 
 
-try:
-    import enchant
+@contextlib.contextmanager
+def _suppress_native_stderr():
+    """libenchant's broker probes every backend (hunspell/nuspell/voikko)
+    and prints a raw C-level warning to fd 2 for each one missing, even
+    when a working backend is found and Dict() succeeds. That's below
+    Python — nothing here raises or logs it — so silence the OS-level fd
+    for the duration of construction instead."""
+    stderr_fd = sys.stderr.fileno()
+    saved_fd = os.dup(stderr_fd)
+    devnull_fd = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(devnull_fd, stderr_fd)
+        yield
+    finally:
+        os.dup2(saved_fd, stderr_fd)
+        os.close(devnull_fd)
+        os.close(saved_fd)
 
-    _spell = enchant.Dict(enchant.get_default_language())
+
+try:
+    # The broker probes backends at import time, not at Dict() — both must
+    # be inside the suppressed block or the import alone prints the warnings.
+    with _suppress_native_stderr():
+        import enchant
+
+        _spell = enchant.Dict(enchant.get_default_language())
 except Exception:
     _spell = None
 
@@ -361,6 +385,12 @@ class Application:
         self.root.update_idletasks()
         self._render_reference()
 
+        # Surface a dead camera like other unavailable states (TTS, no hand).
+        self._camera_ok = self.vs.isOpened()
+        if not self._camera_ok:
+            logger.error("Failed to open camera (index {})", CAMERA_INDEX)
+            self._show_camera_unavailable_state()
+
         self.video_loop()
 
     def _disable_exposure_dynamic_framerate(self):
@@ -587,6 +617,26 @@ class Application:
             justify="center",
         )
 
+    def _show_camera_unavailable_state(self):
+        """Swap the camera panel from its blank black placeholder to an
+        explicit error message, and put the header status into the same
+        danger state as a failed optional dependency (see the "Speak
+        unavailable" treatment of the Speak button) — mirrors
+        _show_empty_skeleton_state's pattern for a camera that never opened
+        rather than a momentarily-idle one."""
+        self.panel.imgtk = None
+        self.panel.config(
+            image="",
+            text="📷\nCamera unavailable\nCheck the connection and restart the app",
+            font=(FONT_FAMILY, 12),
+            fg=DANGER,
+            bg="black",
+            justify="center",
+        )
+        self.status_dot.config(fg=DANGER)
+        self.status_label.config(text="Camera unavailable", fg=DANGER)
+        self.fps_label.config(text="")
+
     def _set_suggestion(self, btn, word):
         """Render one suggestion chip. Blank suggestions (word is just " ",
         the sentinel get_suggestions() returns for "no suggestion here") get
@@ -641,6 +691,9 @@ class Application:
 
     def video_loop(self):
         try:
+            if not self._camera_ok:
+                # camera never opened, don't poll a dead one
+                return
             ok, frame = self.vs.read()
             if not ok or frame is None:
                 return
@@ -770,7 +823,8 @@ class Application:
         if self._pending_count < STABLE_FRAMES:
             return  # not held long enough yet — treat as noise, ignore
 
-        if ch1 == "next" and self.prev_char != "next":
+        # count == -1: nothing committed yet, skip (else reads startup sentinel)
+        if ch1 == "next" and self.prev_char != "next" and self.count >= 0:
             prev = self.ten_prev_char[(self.count - 2) % 10]
             if prev != "next":
                 if prev == "Backspace":
